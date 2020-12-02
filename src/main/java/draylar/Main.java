@@ -1,17 +1,17 @@
 package draylar;
 
+import com.sun.source.tree.Tree;
+import draylar.out.CSVCreator;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Main {
 
-    public static final Path STAT_FILE_PATH = Paths.get("C:\\Users\\samue\\Desktop\\covid_stats.csv");
+    public static final Path STAT_FILE_PATH = Paths.get("covid_stats.csv");
     public static Map<String, State> states = new HashMap<>();
     public static final Date NOVEMBER_14TH = new Date("11/14/2020");
 
@@ -26,11 +26,47 @@ public class Main {
             snapshot.getState().addDate(snapshot.getDate(), snapshot);
         }
 
-        System.out.printf("MN cases on %s: %d%n", NOVEMBER_14TH, states.get("MN").getDate(NOVEMBER_14TH).getConfirmedCases());
+        TreeMap<String, State> sortedStates = new TreeMap<>();
+        sortedStates.putAll(states);
+        states = sortedStates;
+
+        states.forEach((name, state) -> {
+            System.out.printf("%s cases on %s: %d%n", name, NOVEMBER_14TH, states.get(name).getDataFor(NOVEMBER_14TH).getNewCases());
+        });
+
+        CSVCreator creator = new CSVCreator();
+        creator.save(states);
     }
 
     public static DateSnapshot parse(String in) {
-        String[] splitData = in.split(",");
+        // Numbers have commas in them, so we can't split by ','. Instead, we iterate over each char, and build a list of split data by hand.
+        String currentData = "";
+        String[] splitData = new String[15];
+        boolean inQuotation = false;
+        int index = 0;
+
+        for(char c : in.toCharArray()) {
+            // Toggle quotation status
+            switch(c) {
+                case '"':
+                    inQuotation = !inQuotation;
+                    break;
+                case ',':
+                    if(!inQuotation) {
+                        splitData[index] = currentData;
+                        currentData = "";
+                        index++;
+                    }
+                    break;
+                default:
+                    currentData += c;
+                    break;
+            }
+        }
+
+        // final data doesn't end with ,
+        splitData[index] = currentData;
+
         Date date = new Date(splitData[0]);
         String stateName = splitData[1];
         State state;
@@ -58,15 +94,8 @@ public class Main {
         builder.withNewDeaths(tryParse(splitData[10]));
         builder.withProbableNewDeaths(tryParse(splitData[11]));
         builder.withCreatedAt(splitData[12]);
-
-        //  Apparently string.split doesn't include elements at the end of the list when the contents between them are empty, or something.
-        if(splitData.length >= 14) {
-            builder.withConsentCases(parseConsent(splitData[13]));
-
-            if(splitData.length >= 15) {
-                builder.withConsentDeaths(parseConsent(splitData[14]));
-            }
-        }
+        builder.withConsentCases(parseConsent(splitData[13]));
+        builder.withConsentDeaths(parseConsent(splitData[14]));
 
         return builder.build();
     }
@@ -89,6 +118,10 @@ public class Main {
     }
 
     public static Consent parseConsent(String s) {
+        if(s == null || s.isEmpty()) {
+            return Consent.NO_COMMENT;
+        }
+
         switch(s.toLowerCase()) {
             case "agree":
                 return Consent.AGREE;

@@ -1,7 +1,5 @@
 package draylar;
 
-import sun.plugin.dom.exception.InvalidStateException;
-
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,13 +15,13 @@ public class State {
 
     public void addDate(Date on, DateSnapshot data) {
         if(dates.containsKey(on)) {
-            throw new InvalidStateException(String.format("Date %s has already been added to %s!", on.toString(), name));
+            throw new IllegalArgumentException(String.format("Date %s has already been added to %s!", on.toString(), name));
         }
 
         dates.put(on, data);
     }
 
-    public DateSnapshot getDate(Date date) {
+    public DateSnapshot getDataFor(Date date) {
         if(!dates.containsKey(date)) {
             throw new UnsupportedOperationException(String.format("%s requested for %s but was not found!", date, name));
         }
